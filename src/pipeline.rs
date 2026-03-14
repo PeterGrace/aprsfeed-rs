@@ -6,7 +6,7 @@
 
 use tracing::debug;
 
-use crate::{aprs, ax25, rtp};
+use ka9q_proto::{aprs, ax25, rtp};
 
 /// Parse one UDP datagram and return a formatted APRS-IS string if it carries
 /// a valid AX.25 UI APRS frame, or `None` otherwise.
