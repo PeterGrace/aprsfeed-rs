@@ -1,6 +1,6 @@
 [package]
 name = "aprsfeed-rs"
-version = "0.1.2"
+version = "0.1.3"
 edition = "2021"
 authors = ["Peter Grace <pete.grace@gmail.com>"]
 description = "APRS igate feeder: receives AX.25 frames from multicast RTP and forwards to APRS2 network"
