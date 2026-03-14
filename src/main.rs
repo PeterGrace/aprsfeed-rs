@@ -15,19 +15,19 @@
 
 // Tokio's task-local and instrumentation macros live in `tracing`.
 use std::fs::OpenOptions;
+use std::net::IpAddr;
 
 use anyhow::{Context, Result};
 use clap::Parser;
 use tokio::sync::mpsc;
-use tracing::{debug, error, info, warn};
+use tracing::{error, info, warn};
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
-mod aprs;
-mod ax25;
+// `cli` is binary-specific (argument parsing) so it lives only in this crate.
 mod cli;
-mod igate;
-mod multicast;
-mod rtp;
+
+// All other modules are provided by the library crate.
+use aprsfeed_rs::{aprs, igate, multicast, pipeline};
 
 use cli::Args;
 
@@ -82,16 +82,41 @@ async fn main() -> Result<()> {
     // -----------------------------------------------------------------------
     // Bind multicast UDP socket.
     // -----------------------------------------------------------------------
-    let socket = multicast::create_multicast_socket(&args.input, multicast::DEFAULT_RTP_PORT)
-        .await
-        .with_context(|| {
-            format!(
-                "Failed to join multicast group {} on port {}",
-                args.input,
-                multicast::DEFAULT_RTP_PORT
-            )
-        })?;
-    info!(group = %args.input, port = multicast::DEFAULT_RTP_PORT, "Joined multicast group");
+
+    // Parse the optional SSM source address string into a typed IpAddr.
+    let source: Option<IpAddr> = args
+        .source
+        .as_deref()
+        .map(|s| s.parse().with_context(|| format!("Invalid source address: {s}")))
+        .transpose()?;
+
+    let socket = multicast::create_multicast_socket(
+        &args.input,
+        multicast::DEFAULT_RTP_PORT,
+        source,
+    )
+    .await
+    .with_context(|| {
+        format!(
+            "Failed to join multicast group {} on port {}",
+            args.input,
+            multicast::DEFAULT_RTP_PORT
+        )
+    })?;
+
+    match source {
+        Some(src) => info!(
+            group = %args.input,
+            port = multicast::DEFAULT_RTP_PORT,
+            %src,
+            "Joined multicast group (IGMPv3 SSM)"
+        ),
+        None => info!(
+            group = %args.input,
+            port = multicast::DEFAULT_RTP_PORT,
+            "Joined multicast group (IGMPv2 ASM)"
+        ),
+    }
 
     // -----------------------------------------------------------------------
     // Create the bounded channel connecting the receive loop to the iGate task.
@@ -121,7 +146,7 @@ async fn main() -> Result<()> {
 
         let datagram = &buf[..n];
 
-        if let Some(packet) = process_packet(datagram, &args.user) {
+        if let Some(packet) = pipeline::process_packet(datagram, &args.user) {
             match tx.try_send(packet) {
                 Ok(()) => {}
                 Err(mpsc::error::TrySendError::Full(dropped)) => {
@@ -138,34 +163,3 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-/// Parse one UDP datagram (an RTP packet) and return a formatted APRS-IS string
-/// if it contains a valid AX.25 UI APRS frame, or `None` otherwise.
-///
-/// # Arguments
-///
-/// * `data` - Raw UDP datagram bytes.
-/// * `user` - Local station callsign injected into the TNC2 path as `qAO,USER`.
-///
-/// # Returns
-///
-/// `Some(tnc2_string)` when the datagram carries an AX.25 UI APRS frame that
-/// passes all filters, `None` in all other cases.
-fn process_packet(data: &[u8], user: &str) -> Option<String> {
-    // Parse the RTP header and obtain the payload slice.
-    let (rtp_hdr, payload) = rtp::RtpHeader::parse(data)?;
-
-    // We only handle payload type 96 (raw AX.25).
-    if rtp_hdr.payload_type != rtp::AX25_PAYLOAD_TYPE {
-        debug!(
-            pt = rtp_hdr.payload_type,
-            "Ignoring RTP packet with unexpected payload type"
-        );
-        return None;
-    }
-
-    // Decode the AX.25 frame from the RTP payload.
-    let frame = ax25::Ax25Frame::parse(payload)?;
-
-    // Format and filter the APRS packet.
-    aprs::format_aprs_packet(&frame, user)
-}

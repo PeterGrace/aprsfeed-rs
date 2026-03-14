@@ -29,6 +29,16 @@ pub struct Args {
     #[arg(short = 'P', long = "port", default_value_t = 14580)]
     pub port: u16,
 
+    /// Source-specific multicast (SSM / IGMPv3) source address.
+    ///
+    /// When supplied, the socket performs an IGMPv3 INCLUDE-mode join
+    /// (`IP_ADD_SOURCE_MEMBERSHIP` for IPv4, `MCAST_JOIN_SOURCE_GROUP` for
+    /// IPv6) restricted to traffic originating from this address.  When
+    /// omitted the socket falls back to an IGMPv2 any-source join
+    /// (`IP_ADD_MEMBERSHIP`).
+    #[arg(short = 's', long = "source")]
+    pub source: Option<String>,
+
     /// Optional path to a log file.  When set, tracing events are also written
     /// to this file in addition to stderr.
     #[arg(short = 'f', long = "logfile")]
