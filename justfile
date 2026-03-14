@@ -1,6 +1,9 @@
 build:
   cargo build --release
 
+install:
+  sudo systemctl stop aprsfeed-rs;sudo cp target/release/aprsfeed-rs /usr/local/sbin;sudo systemctl start aprsfeed-rs
+
 run:
   ./target/debug/aprsfeed-rs -v -I ax25.local -u W3POG -H noam.aprs2.net -f ./aprsfeed.log
 
