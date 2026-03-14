@@ -3,15 +3,14 @@ name = "aprsfeed-rs"
 version = "0.1.0"
 edition = "2021"
 authors = ["Peter Grace <pete.grace@gmail.com>"]
+description = "APRS igate feeder: receives AX.25 frames from multicast RTP and forwards to APRS2 network"
 
 [dependencies]
-ctrlc = { version = "3.4.5", features = ["termination"] }
-lazy_static = "1.5.0"
-serde = { version = "1.0.216", features = ["derive"] }
+anyhow = "1.0"
+clap = { version = "4.5", features = ["derive"] }
+dotenvy = "0.15"
+socket2 = { version = "0.5", features = ["all"] }
 thiserror = "2.0.6"
-tokio = { version = "1.42.0", features = ["rt-multi-thread", "macros", "time"] }
+tokio = { version = "1.42.0", features = ["rt-multi-thread", "macros", "time", "net", "io-util", "sync"] }
 tracing = "0.1.41"
-tracing-log = "0.2.0"
 tracing-subscriber = { version = "0.3.19", features = ["fmt", "env-filter"] }
-console-subscriber = "0.4.1"
-dotenv = "0.15.0"
