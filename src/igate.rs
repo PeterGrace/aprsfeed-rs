@@ -176,7 +176,7 @@ async fn connect_and_run(
                             .await
                             .context("Failed to write packet")?;
                         writer.flush().await.context("Failed to flush packet")?;
-                        debug!("Sent: {packet}");
+                        info!("Sent: {packet}");
                     }
                     None => {
                         // Sender side of the channel was dropped → clean shutdown.
