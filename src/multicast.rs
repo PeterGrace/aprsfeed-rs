@@ -123,8 +123,12 @@ fn create_v4_socket(mcast_addr: Ipv4Addr, port: u16, source: Option<Ipv4Addr>) -
         .set_reuse_port(true)
         .context("set_reuse_port failed")?;
 
-    // Bind to INADDR_ANY:port so we receive multicast traffic on all interfaces.
-    let bind_addr: SocketAddr = (IpAddr::V4(Ipv4Addr::UNSPECIFIED), port).into();
+    // Bind to the multicast group address (not INADDR_ANY) so the kernel only
+    // delivers datagrams destined for this specific group.  On Linux with
+    // SO_REUSEPORT, binding to INADDR_ANY causes the socket to receive traffic
+    // for *every* multicast group that any local process has joined on the same
+    // port — not just the group this socket joined via IP_ADD_MEMBERSHIP.
+    let bind_addr: SocketAddr = (IpAddr::V4(mcast_addr), port).into();
     socket
         .bind(&bind_addr.into())
         .with_context(|| format!("Failed to bind to {bind_addr}"))?;
@@ -168,7 +172,10 @@ fn create_v6_socket(
         .set_reuse_port(true)
         .context("set_reuse_port failed")?;
 
-    let bind_addr: SocketAddr = (IpAddr::V6(Ipv6Addr::UNSPECIFIED), port).into();
+    // Bind to the multicast group address (not ::) for the same reason as the
+    // IPv4 path: SO_REUSEPORT on Linux leaks other groups' traffic when bound
+    // to the unspecified address.
+    let bind_addr: SocketAddr = (IpAddr::V6(mcast_addr), port).into();
     socket
         .bind(&bind_addr.into())
         .with_context(|| format!("Failed to bind to {bind_addr}"))?;
